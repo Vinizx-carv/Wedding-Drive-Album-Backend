@@ -1,0 +1,25 @@
+# Dependências
+node_modules/
+
+# Arquivos compilados
+dist/
+build/
+
+# Variáveis de ambiente
+.env
+.env.*
+
+# Permitir arquivo de exemplo
+!.env.example
+
+# Token OAuth do Google Drive
+data/token.json
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Arquivos temporários
+tmp/
+temp/
