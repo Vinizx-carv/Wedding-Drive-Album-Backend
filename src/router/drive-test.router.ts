@@ -1,12 +1,19 @@
-
 import { Router } from "express";
 import { getDrive } from "../google.js";
+import { requireAdmin } from "../middlewares/requireAdmin.js";
 
 const router = Router();
 
-router.get("/status", async (_req, res) => {
+router.get("/status", requireAdmin, async (req, res) => {
   try {
-    const drive = await getDrive();
+    if (!req.adminId) {
+      return res.status(401).json({
+        connected: false,
+        message: "Login necessário.",
+      });
+    }
+
+    const drive = await getDrive(req.adminId);
 
     const result = await drive.files.list({
       pageSize: 5,
@@ -20,6 +27,13 @@ router.get("/status", async (_req, res) => {
     });
   } catch (error) {
     console.error("Erro ao testar Google Drive:", error);
+
+    if (error instanceof Error && error.message === "GOOGLE_NOT_CONNECTED") {
+      return res.status(400).json({
+        connected: false,
+        message: "Conecte sua conta Google antes de testar o Drive.",
+      });
+    }
 
     return res.status(500).json({
       connected: false,
