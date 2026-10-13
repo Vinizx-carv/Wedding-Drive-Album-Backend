@@ -5,7 +5,7 @@ import {
   getGoogleAuthUrl,
   exchangeCode,
 } from "../google.js";
-
+import { supabase } from "../services/supabase.js";
 import { requireAdmin } from "../middlewares/requireAdmin.js";
 
 const router = Router();
@@ -30,6 +30,45 @@ router.get("/google", requireAdmin, async (req, res) => {
 
     res.status(500).json({
       message: "Não foi possível iniciar a conexão com o Google Drive.",
+    });
+  }
+});
+
+// Verifica se o administrador conectou o Google Drive.
+router.get("/google/status", requireAdmin, async (req, res) => {
+  try {
+    const userId = req.adminId;
+
+    if (!userId) {
+      res.status(401).json({
+        message: "Usuário não autenticado.",
+      });
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("google_connections")
+      .select("user_id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Erro ao consultar status do Google Drive:", error);
+
+      res.status(500).json({
+        message: "Não foi possível verificar a conexão com o Google Drive.",
+      });
+      return;
+    }
+
+    res.json({
+      connected: Boolean(data),
+    });
+  } catch (error) {
+    console.error("Erro ao verificar Google Drive:", error);
+
+    res.status(500).json({
+      message: "Erro ao verificar a conexão com o Google Drive.",
     });
   }
 });
