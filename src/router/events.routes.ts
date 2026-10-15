@@ -94,6 +94,37 @@ router.post("/", requireAdmin, upload.single("cover"), async (req, res) => {
   }
 });
 
+async function getEventStats(eventId: string) {
+  const [visitors, photos, featured] = await Promise.all([
+    supabase
+      .from("visitors")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", eventId),
+
+    supabase
+      .from("photos")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", eventId),
+
+    supabase
+      .from("photos")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", eventId)
+      .eq("is_featured", true),
+  ]);
+
+  if (visitors.error || photos.error || featured.error) {
+    throw new Error("Erro ao calcular estatísticas do evento.");
+  }
+
+  return {
+    uniqueVisitors: visitors.count ?? 0,
+    totalPhotos: photos.count ?? 0,
+    featuredPhotos: featured.count ?? 0,
+  };
+}
+
+
 router.get("/", requireAdmin, async (req, res) => {
   const { data, error } = await supabase
     .from("events")
@@ -108,21 +139,38 @@ router.get("/", requireAdmin, async (req, res) => {
     return;
   }
 
-  res.json({
-    events: (data ?? []).map((event) => ({
-      id: event.id,
-      name: event.name,
-      event_date: event.event_date,
-      public_token: event.public_token,
-      created_at: event.created_at,
-      maxPhotosPerGuest: event.max_photos_per_guest,
-      maxGuests: event.max_guests,
-      cover_file_id: event.cover_file_id,
-      coverUrl: `/api/events/public/${event.public_token}/cover`,
-      publicUrl: publicEventUrl(event.public_token),
-    })),
-  });
+  try {
+    const eventsWithStats = await Promise.all(
+      (data ?? []).map(async (event) => {
+        const stats = await getEventStats(event.id);
+
+        return {
+          id: event.id,
+          name: event.name,
+          event_date: event.event_date,
+          public_token: event.public_token,
+          created_at: event.created_at,
+          maxPhotosPerGuest: event.max_photos_per_guest,
+          maxGuests: event.max_guests,
+          cover_file_id: event.cover_file_id,
+          coverUrl: `/api/events/public/${event.public_token}/cover`,
+          publicUrl: publicEventUrl(event.public_token),
+          stats,
+          photoCount: stats.totalPhotos,
+          visitorCount: stats.uniqueVisitors,
+        };
+      }),
+    );
+
+    res.json({ events: eventsWithStats });
+  } catch (error) {
+    console.error("Erro ao calcular estatísticas:", error);
+    res.status(500).json({
+      message: "Erro ao carregar estatísticas dos eventos.",
+    });
+  }
 });
+
 
 router.get("/public/:token", async (req, res) => {
   const { data, error } = await supabase

@@ -1,10 +1,6 @@
-
 import { Router } from "express";
 
-import {
-  getGoogleAuthUrl,
-  exchangeCode,
-} from "../google.js";
+import { getGoogleAuthUrl, exchangeCode } from "../google.js";
 import { supabase } from "../services/supabase.js";
 import { requireAdmin } from "../middlewares/requireAdmin.js";
 
@@ -78,31 +74,33 @@ router.get("/google/callback", async (req, res) => {
   const { code, state, error } = req.query;
 
   if (error) {
-    res.status(400).send(
-      "A autorização do Google foi cancelada ou recusada.",
-    );
+    res.status(400).send("A autorização do Google foi cancelada ou recusada.");
     return;
   }
 
   if (typeof code !== "string" || typeof state !== "string") {
-    res.status(400).send(
-      "Código ou estado de autorização ausente.",
-    );
+    res.status(400).send("Código ou estado de autorização ausente.");
     return;
   }
 
   try {
     await exchangeCode(code, state);
 
-    res.send(
-      "Google Drive conectado com sucesso. Você já pode fechar esta página.",
-    );
+    const frontendUrl = process.env.FRONTEND_URL;
+
+    if (!frontendUrl) {
+      throw new Error("FRONTEND_URL não configurada.");
+    }
+
+    return res.redirect(`${frontendUrl.replace(/\/$/, "")}/?drive=connected`);
   } catch (error) {
     console.error("Erro na autorização do Google:", error);
 
-    res.status(400).send(
-      "Não foi possível conectar o Google Drive. Tente novamente pelo sistema.",
-    );
+    res
+      .status(400)
+      .send(
+        "Não foi possível conectar o Google Drive. Tente novamente pelo sistema.",
+      );
   }
 });
 
